@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+backend/env/
+env/
+venv/
+.env
+.env.local
+.env.*.local
+
+# Build directories
+frontend/.next/
+out/
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+backend/db.sqlite3
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
