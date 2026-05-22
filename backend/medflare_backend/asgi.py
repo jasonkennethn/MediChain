@@ -1,8 +1,8 @@
 """
-ASGI config for medichain_backend project.
+ASGI config for medflare_backend project.
 """
 import os
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'medichain_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'medflare_backend.settings')
 application = get_asgi_application()

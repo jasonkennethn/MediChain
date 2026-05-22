@@ -8,11 +8,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User, Hospital, Pharmacy, Doctor, Patient, Appointment
+from .models import User, Hospital, Pharmacy, Doctor, Patient, Appointment, PharmacyInventory, PharmacyOrder
 from .serializers import (
     UserSerializer, LoginSerializer, RegisterSerializer,
     HospitalSerializer, HospitalListSerializer, PharmacySerializer,
     DoctorSerializer, PatientSerializer, AppointmentSerializer,
+    PharmacyInventorySerializer, PharmacyOrderSerializer
 )
 
 
@@ -383,3 +384,73 @@ def verify_entity_view(request, entity_type, entity_id):
             return Response({'success': False, 'error': 'Invalid entity type'}, status=400)
     except (Hospital.DoesNotExist, Pharmacy.DoesNotExist):
         return Response({'success': False, 'error': 'Entity not found'}, status=404)
+
+
+class PharmacyInventoryListCreateView(generics.ListCreateAPIView):
+    """List and create pharmacy inventory."""
+    serializer_class = PharmacyInventorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                return PharmacyInventory.objects.filter(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                return PharmacyInventory.objects.none()
+        return PharmacyInventory.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                serializer.save(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Pharmacy profile not found.")
+        else:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only pharmacies can add inventory.")
+
+
+class PharmacyOrderListCreateView(generics.ListCreateAPIView):
+    """List and create pharmacy orders."""
+    serializer_class = PharmacyOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                return PharmacyOrder.objects.filter(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                return PharmacyOrder.objects.none()
+        return PharmacyOrder.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                serializer.save(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Pharmacy profile not found.")
+        else:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only pharmacies can create orders.")
+
+
+class PharmacyOrderDetailView(generics.RetrieveUpdateAPIView):
+    """Retrieve or update pharmacy order (e.g. change status to dispensed)."""
+    queryset = PharmacyOrder.objects.all()
+    serializer_class = PharmacyOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                return PharmacyOrder.objects.filter(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                return PharmacyOrder.objects.none()
+        return PharmacyOrder.objects.none()

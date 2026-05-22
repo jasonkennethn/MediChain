@@ -232,3 +232,47 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f'{self.patient.user.name} → Dr. {self.doctor.name} on {self.appointment_date}'
+
+
+class PharmacyInventory(models.Model):
+    """Inventory for a Pharmacy."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pharmacy = models.ForeignKey(Pharmacy, on_delete=models.CASCADE, related_name='inventory')
+    medicine_name = models.CharField(max_length=255)
+    stock_quantity = models.PositiveIntegerField(default=0)
+    location = models.CharField(max_length=100, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'pharmacy_inventory'
+        ordering = ['medicine_name']
+
+    def __str__(self):
+        return f'{self.medicine_name} - {self.pharmacy.pharmacy_name}'
+
+
+class PharmacyOrder(models.Model):
+    """Prescription Order at a Pharmacy."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('dispensed', 'Dispensed'),
+        ('cancelled', 'Cancelled')
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pharmacy = models.ForeignKey(Pharmacy, on_delete=models.CASCADE, related_name='orders')
+    patient_name = models.CharField(max_length=255)
+    medicine_name = models.CharField(max_length=255)
+    quantity = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'pharmacy_order'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Order: {self.medicine_name} for {self.patient_name}'

@@ -3,7 +3,7 @@ MediChain API Serializers
 """
 
 from rest_framework import serializers
-from .models import User, Hospital, Pharmacy, Doctor, Patient, Appointment
+from .models import User, Hospital, Pharmacy, Doctor, Patient, Appointment, PharmacyInventory, PharmacyOrder
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -152,3 +152,29 @@ class RegisterSerializer(serializers.Serializer):
             if User.objects.filter(aadhar_number=value).exists():
                 raise serializers.ValidationError('This Aadhar number is already registered.')
         return value
+
+
+class PharmacyInventorySerializer(serializers.ModelSerializer):
+    """Serializer for Pharmacy Inventory."""
+    pharmacy_name = serializers.CharField(source='pharmacy.pharmacy_name', read_only=True)
+
+    class Meta:
+        model = PharmacyInventory
+        fields = [
+            'id', 'pharmacy', 'pharmacy_name', 'medicine_name', 
+            'stock_quantity', 'location', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class PharmacyOrderSerializer(serializers.ModelSerializer):
+    """Serializer for Pharmacy Orders."""
+    pharmacy_name = serializers.CharField(source='pharmacy.pharmacy_name', read_only=True)
+
+    class Meta:
+        model = PharmacyOrder
+        fields = [
+            'id', 'pharmacy', 'pharmacy_name', 'patient_name', 
+            'medicine_name', 'quantity', 'status', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

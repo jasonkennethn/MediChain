@@ -32,4 +32,9 @@ urlpatterns = [
     # Appointments
     path('appointments/', views.AppointmentListCreateView.as_view(), name='appointment-list'),
     path('appointments/<uuid:pk>/', views.AppointmentDetailView.as_view(), name='appointment-detail'),
+
+    # Pharmacy Inventory & Orders
+    path('pharmacy/inventory/', views.PharmacyInventoryListCreateView.as_view(), name='pharmacy-inventory'),
+    path('pharmacy/orders/', views.PharmacyOrderListCreateView.as_view(), name='pharmacy-orders'),
+    path('pharmacy/orders/<uuid:pk>/', views.PharmacyOrderDetailView.as_view(), name='pharmacy-order-detail'),
 ]

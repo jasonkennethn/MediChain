@@ -1,5 +1,5 @@
 """
-Django settings for medichain_backend project.
+Django settings for medflare_backend project.
 """
 
 import os
@@ -44,7 +44,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'medichain_backend.urls'
+ROOT_URLCONF = 'medflare_backend.urls'
 
 TEMPLATES = [
     {
@@ -62,7 +62,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'medichain_backend.wsgi.application'
+WSGI_APPLICATION = 'medflare_backend.wsgi.application'
 
 # Database — default SQLite3 as requested
 DATABASES = {
