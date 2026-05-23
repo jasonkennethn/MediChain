@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
         setAnalytics(data);
       } else if (isHospital) {
         const token = localStorage.getItem('medichain_access_token');
-        const res = await fetch('http://localhost:8000/api/hospital/analytics/', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/hospital/analytics/`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
