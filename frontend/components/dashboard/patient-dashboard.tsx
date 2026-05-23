@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VoiceInput } from '@/components/ui/voice-input';
-import { Heart, Phone, MapPin, Calendar, Building2, Clock, Pill } from 'lucide-react';
+import { Heart, Phone, MapPin, Calendar, Building2, Clock, Pill, FileText } from 'lucide-react';
 
 export function PatientDashboard({
   profile,
@@ -193,23 +193,23 @@ export function PatientDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
-                <span>My Appointments</span>
+                <span>Upcoming Appointments</span>
               </CardTitle>
-              <CardDescription>Your healthcare history</CardDescription>
+              <CardDescription>Your scheduled consultations</CardDescription>
             </CardHeader>
             <CardContent>
-              {appointments?.length === 0 ? (
+              {appointments?.filter((a: any) => a.status === 'scheduled').length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
                   <Calendar className="mx-auto h-8 w-8 opacity-40 mb-2" />
-                  No scheduled appointments yet.
+                  No scheduled appointments.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {appointments?.map((apt: any) => (
+                  {appointments?.filter((a: any) => a.status === 'scheduled').map((apt: any) => (
                     <div key={apt.id} className="p-3 border border-border/50 rounded-lg bg-card space-y-1.5">
                       <div className="flex justify-between items-start">
                         <p className="font-semibold text-foreground text-sm">Dr. {apt.doctor_name}</p>
-                        <Badge className="text-[10px] px-1.5 py-0.5 capitalize" variant={apt.status === 'scheduled' ? 'default' : 'secondary'}>
+                        <Badge className="text-[10px] px-1.5 py-0.5 capitalize" variant="default">
                           {apt.status}
                         </Badge>
                       </div>
@@ -219,6 +219,57 @@ export function PatientDashboard({
                         {new Date(apt.appointment_date).toLocaleString()}
                       </p>
                       {apt.reason && <p className="text-xs italic text-muted-foreground border-t pt-1.5 mt-1.5">" {apt.reason} "</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Past Visits */}
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-chart-2" />
+                <span>Past Visits</span>
+              </CardTitle>
+              <CardDescription>Completed consultations & prescriptions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {appointments?.filter((a: any) => a.status === 'completed').length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  No completed visits yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {appointments?.filter((a: any) => a.status === 'completed').map((apt: any) => (
+                    <div key={apt.id} className="p-3 border border-border/50 rounded-lg bg-card space-y-2">
+                      <div className="flex justify-between items-start">
+                        <p className="font-semibold text-foreground text-sm">Dr. {apt.doctor_name}</p>
+                        <Badge className="text-[10px] capitalize bg-chart-2/10 text-chart-2 border-chart-2/20" variant="outline">
+                          Completed
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {apt.doctor_specialization} @ {apt.hospital_name} — {new Date(apt.appointment_date).toLocaleDateString()}
+                      </p>
+                      {apt.diagnosis && (
+                        <div className="text-xs p-2 bg-primary/5 rounded-md border border-primary/10">
+                          <span className="font-semibold">Diagnosis:</span> {apt.diagnosis}
+                        </div>
+                      )}
+                      {apt.prescription_data && apt.prescription_data.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {(typeof apt.prescription_data === 'string' ? JSON.parse(apt.prescription_data) : apt.prescription_data).map((med: any, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-[10px]">
+                              <Pill className="h-2.5 w-2.5 mr-0.5" /> {med.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {apt.follow_up_instructions && (
+                        <p className="text-[10px] text-muted-foreground italic border-t pt-1.5 mt-1">Follow-up: {apt.follow_up_instructions}</p>
+                      )}
                     </div>
                   ))}
                 </div>

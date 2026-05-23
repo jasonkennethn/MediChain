@@ -94,6 +94,12 @@ class Hospital(models.Model):
     specializations = models.JSONField(default=list, blank=True)
     facilities = models.JSONField(default=list, blank=True)
     is_verified = models.BooleanField(default=False)
+    
+    # Branding & Prescription Settings
+    logo = models.ImageField(upload_to='hospital_logos/', null=True, blank=True)
+    prescription_header = models.ImageField(upload_to='prescription_headers/', null=True, blank=True)
+    prescription_footer = models.ImageField(upload_to='prescription_footers/', null=True, blank=True)
+    prescription_layout = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -104,6 +110,34 @@ class Hospital(models.Model):
 
     def __str__(self):
         return self.hospital_name
+
+
+class HospitalStaff(models.Model):
+    """Staff members associated with a hospital."""
+    
+    ROLE_CHOICES = [
+        ('hospital_admin', 'Hospital Admin'),
+        ('director', 'Director'),
+        ('superintendent', 'Superintendent'),
+        ('doctor', 'Doctor'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='staff_members')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='hospital_staff_profile')
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='doctor')
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'hospital_staff'
+        unique_together = ('hospital', 'user')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.name} - {self.get_role_display()} at {self.hospital.hospital_name}'
 
 
 class Pharmacy(models.Model):
@@ -138,6 +172,7 @@ class Doctor(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospital = models.ForeignKey(Hospital, on_delete=models.CASCADE, related_name='doctors')
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctor_profile')
     name = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
@@ -276,3 +311,13 @@ class PharmacyOrder(models.Model):
 
     def __str__(self):
         return f'Order: {self.medicine_name} for {self.patient_name}'
+
+
+class Feedback(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback from {self.user.name} ({self.created_at.date()})"

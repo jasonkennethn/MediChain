@@ -69,7 +69,7 @@ export default function ConsultationPage({ params }: { params: { id: string } })
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${localStorage.getItem('medichain_access_token')}`
         }
       });
       const data = await res.json();
@@ -190,9 +190,13 @@ export default function ConsultationPage({ params }: { params: { id: string } })
     
     setIsExtracting(true);
     try {
+      const token = localStorage.getItem('medichain_access_token');
       const res = await fetch('/api/clinical-extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           transcript: textToProcess,
           currentState: clinicalState
@@ -220,7 +224,7 @@ export default function ConsultationPage({ params }: { params: { id: string } })
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${localStorage.getItem('medichain_access_token')}`
         },
         body: JSON.stringify({
           status: 'completed',

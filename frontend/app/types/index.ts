@@ -7,6 +7,9 @@ export interface User {
   aadharNumber?: string;
   email?: string;
   role: UserRole;
+  staff_role?: string;
+  doctor_profile_id?: string;
+  hospital_id?: string;
   avatar?: string;
   createdAt: Date;
   updatedAt: Date;

@@ -45,7 +45,24 @@ const clinicalStateSchema: Schema = {
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized: Missing Authorization header' }, { status: 401 });
+    }
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const configRes = await fetch(`${apiBaseUrl}/api/config/keys/`, {
+      headers: {
+        'Authorization': authHeader
+      }
+    });
+
+    if (!configRes.ok) {
+      return NextResponse.json({ error: 'Unauthorized or failed to fetch keys from backend' }, { status: 401 });
+    }
+
+    const { gemini_api_key } = await configRes.json();
+    const apiKey = gemini_api_key;
     if (!apiKey) {
       return NextResponse.json({ error: 'Gemini API key not found' }, { status: 500 });
     }
@@ -68,7 +85,6 @@ export async function POST(req: Request) {
 
     const prompt = `
       You are an expert AI clinical medical scribe. Your task is to update the patient's clinical state based on the latest transcript of a doctor-patient conversation.
-      The conversation may be multilingual (English, Hindi, Kannada, Tamil, Telugu, Malayalam) or code-mixed.
       
       Current Clinical State:
       ${JSON.stringify(currentState, null, 2)}
@@ -77,10 +93,12 @@ export async function POST(req: Request) {
       ${transcript}
       
       Instructions:
-      1. Analyze the new transcript and extract any newly mentioned symptoms, diagnosis, prescriptions, follow-up advice, or tests.
-      2. Merge this new information with the "Current Clinical State".
-      3. Return the updated JSON state exactly matching the schema. 
-      4. Ensure medicines have a name, boolean flags for morning/afternoon/night, and an integer for days. If not explicitly mentioned, assume standard values (e.g. 1 day, or what's reasonable) or leave false.
+      1. The recent transcript may be in English or any Indian language (such as Hindi, Kannada, Tamil, Telugu, Malayalam, Marathi, Bengali) or a code-mixed combination (e.g., Hinglish, Kanglish). You must accurately understand all these languages and correctly translate and merge the clinical details into the final state in professional, standardized clinical English.
+      2. Update the "diagnosis" field as a detailed, pointwise paragraph explaining the provisional diagnosis. Neatly list out the symptoms, durations, and any other relevant observations using clear bullet points (e.g. "- Chief Symptom (duration: X days): details"). Ensure it is structured neatly as a point-by-point markdown/text list within the diagnosis field so the doctor can read the complete context easily.
+      3. Extract any newly mentioned symptoms and add them to the "symptoms" array.
+      4. Extract any prescribed medicines and append/update them in "prescription_data". Ensure each medicine contains a clean name, timing boolean flags (morning/afternoon/night), and duration (days). If timings/duration are not explicitly specified, fill them logically.
+      5. Extract any tests advised or follow-up instructions and merge them into "tests_advised" and "follow_up_instructions" respectively.
+      6. Return the updated JSON state exactly matching the schema, ensuring valid JSON formatting.
     `;
 
     const result = await model.generateContent(prompt);

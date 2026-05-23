@@ -28,3 +28,6 @@ backend/db.sqlite3
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Screenshots
+frontend/*.png

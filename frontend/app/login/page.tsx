@@ -320,13 +320,22 @@ export default function LoginPage() {
 
             {/* Demo Credentials */}
             <div className="mt-6 p-4 rounded-lg bg-muted/30 border border-border/50">
-              <p className="text-xs font-semibold text-foreground mb-2">Demo Credentials:</p>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li className="flex justify-between"><span className="font-medium">Patient:</span> <code className="bg-background px-1.5 py-0.5 rounded">9876543210</code></li>
-                <li className="flex justify-between"><span className="font-medium">Hospital:</span> <code className="bg-background px-1.5 py-0.5 rounded">9876543211</code></li>
-                <li className="flex justify-between"><span className="font-medium">Pharmacy:</span> <code className="bg-background px-1.5 py-0.5 rounded">9876543212</code></li>
-                <li className="flex justify-between"><span className="font-medium">Admin:</span> <code className="bg-background px-1.5 py-0.5 rounded">9876543213</code></li>
-              </ul>
+              <p className="text-xs font-semibold text-foreground mb-2">Demo Credentials (Login with Phone):</p>
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground mb-1">General Users:</p>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Patient:</span> <code>9876543210</code></div>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Pharmacy:</span> <code>9876543212</code></div>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Platform Admin:</span> <code>9876543213</code></div>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground mb-1">Hospital Staff:</p>
+                  <div className="flex justify-between items-center bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20"><span className="font-medium">Hosp Admin:</span> <code>9876543211</code></div>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Director:</span> <code>9876543221</code></div>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Superintendent:</span> <code>9876543222</code></div>
+                  <div className="flex justify-between items-center bg-background px-2 py-1 rounded border border-border/50"><span className="font-medium">Doctor:</span> <code>9876543223</code></div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

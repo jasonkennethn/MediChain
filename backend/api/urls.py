@@ -35,6 +35,21 @@ urlpatterns = [
 
     # Pharmacy Inventory & Orders
     path('pharmacy/inventory/', views.PharmacyInventoryListCreateView.as_view(), name='pharmacy-inventory'),
+    path('pharmacy/inventory/<uuid:pk>/', views.PharmacyInventoryDetailView.as_view(), name='pharmacy-inventory-detail'),
     path('pharmacy/orders/', views.PharmacyOrderListCreateView.as_view(), name='pharmacy-orders'),
     path('pharmacy/orders/<uuid:pk>/', views.PharmacyOrderDetailView.as_view(), name='pharmacy-order-detail'),
+    path('config/keys/', views.ConfigKeysView.as_view(), name='config-keys'),
+
+    # Hospital Admin Features
+    path('hospital/staff/', views.HospitalStaffListCreateView.as_view(), name='hospital-staff-list'),
+    path('hospital/staff/<uuid:pk>/', views.HospitalStaffDetailView.as_view(), name='hospital-staff-detail'),
+    path('hospital/analytics/', views.HospitalAnalyticsView.as_view(), name='hospital-analytics'),
+    # Feedback
+    path('feedback/', views.FeedbackCreateView.as_view(), name='feedback-create'),
+
+    # Doctor Features
+    path('patients/lookup/', views.PatientLookupView.as_view(), name='patient-lookup'),
+    path('doctor/analytics/', views.DoctorAnalyticsView.as_view(), name='doctor-analytics'),
+    path('doctors/<uuid:pk>/toggle-availability/', views.DoctorToggleAvailabilityView.as_view(), name='doctor-toggle-availability'),
+    path('hospital/staff/<uuid:pk>/toggle-access/', views.StaffToggleAccessView.as_view(), name='staff-toggle-access'),
 ]

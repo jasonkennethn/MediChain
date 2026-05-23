@@ -3,19 +3,63 @@ MediChain API Serializers
 """
 
 from rest_framework import serializers
-from .models import User, Hospital, Pharmacy, Doctor, Patient, Appointment, PharmacyInventory, PharmacyOrder
+from .models import User, Hospital, HospitalStaff, Pharmacy, Doctor, Patient, Appointment, PharmacyInventory, PharmacyOrder, Feedback
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for the User model."""
 
+    staff_role = serializers.SerializerMethodField()
+    doctor_profile_id = serializers.SerializerMethodField()
+    hospital_id = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
             'id', 'name', 'phone_number', 'aadhar_number',
-            'email', 'role', 'avatar', 'created_at', 'updated_at',
+            'email', 'role', 'staff_role', 'doctor_profile_id', 'hospital_id',
+            'is_active', 'avatar', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_staff_role(self, obj):
+        if obj.role == 'hospital':
+            # Check if they are a specific staff member
+            try:
+                staff = HospitalStaff.objects.get(user=obj)
+                return staff.role
+            except HospitalStaff.DoesNotExist:
+                # If they own the Hospital object directly, they are a primary admin
+                try:
+                    if Hospital.objects.filter(admin=obj).exists():
+                        return 'admin'
+                except Exception:
+                    pass
+        return None
+
+    def get_doctor_profile_id(self, obj):
+        if obj.role == 'hospital':
+            try:
+                return str(obj.doctor_profile.id)
+            except Exception:
+                pass
+        return None
+
+    def get_hospital_id(self, obj):
+        if obj.role == 'hospital':
+            try:
+                return str(obj.doctor_profile.hospital.id)
+            except Exception:
+                pass
+            try:
+                return str(HospitalStaff.objects.get(user=obj).hospital.id)
+            except Exception:
+                pass
+            try:
+                return str(obj.hospital_profile.id)
+            except Exception:
+                pass
+        return None
 
 
 class PatientSerializer(serializers.ModelSerializer):
@@ -33,6 +77,41 @@ class PatientSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+class PatientDetailSerializer(serializers.ModelSerializer):
+    """Detailed Patient serializer with past visit history for doctor lookup."""
+    user = UserSerializer(read_only=True)
+    past_visits = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Patient
+        fields = [
+            'id', 'user', 'date_of_birth', 'gender', 'blood_group',
+            'address', 'city', 'state', 'pincode', 'emergency_contact',
+            'medical_history', 'allergies', 'past_visits',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_past_visits(self, obj):
+        from .models import Appointment
+        appointments = Appointment.objects.filter(patient=obj).order_by('-appointment_date')[:20]
+        return [{
+            'id': str(apt.id),
+            'doctor_name': apt.doctor.name,
+            'doctor_specialization': apt.doctor.specialization,
+            'hospital_name': apt.hospital.hospital_name,
+            'appointment_date': apt.appointment_date.isoformat(),
+            'status': apt.status,
+            'reason': apt.reason,
+            'symptoms': apt.symptoms,
+            'diagnosis': apt.diagnosis,
+            'prescription_data': apt.prescription_data,
+            'follow_up_instructions': apt.follow_up_instructions,
+            'tests_advised': apt.tests_advised,
+            'notes': apt.notes,
+        } for apt in appointments]
+
+
 class HospitalSerializer(serializers.ModelSerializer):
     """Serializer for the Hospital model."""
     admin = UserSerializer(read_only=True)
@@ -43,7 +122,20 @@ class HospitalSerializer(serializers.ModelSerializer):
             'id', 'admin', 'hospital_name', 'registration_number',
             'address', 'city', 'state', 'pincode', 'phone', 'email',
             'specializations', 'facilities', 'is_verified',
+            'logo', 'prescription_header', 'prescription_footer', 'prescription_layout',
             'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class HospitalStaffSerializer(serializers.ModelSerializer):
+    """Serializer for HospitalStaff model."""
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = HospitalStaff
+        fields = [
+            'id', 'hospital', 'user', 'role', 'is_active',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -89,7 +181,14 @@ class DoctorSerializer(serializers.ModelSerializer):
             'specialization', 'qualification', 'experience_years',
             'consultation_fee', 'is_available', 'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'hospital', 'created_at', 'updated_at']
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    """Serializer for the Feedback model."""
+    class Meta:
+        model = Feedback
+        fields = ['id', 'user', 'message', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -110,6 +209,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'patient': {'required': False, 'allow_null': True}
+        }
+
 
 
 class LoginSerializer(serializers.Serializer):
@@ -164,7 +267,7 @@ class PharmacyInventorySerializer(serializers.ModelSerializer):
             'id', 'pharmacy', 'pharmacy_name', 'medicine_name', 
             'stock_quantity', 'location', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'pharmacy', 'created_at', 'updated_at']
 
 
 class PharmacyOrderSerializer(serializers.ModelSerializer):
@@ -177,4 +280,4 @@ class PharmacyOrderSerializer(serializers.ModelSerializer):
             'id', 'pharmacy', 'pharmacy_name', 'patient_name', 
             'medicine_name', 'quantity', 'status', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'pharmacy', 'created_at', 'updated_at']

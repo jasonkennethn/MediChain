@@ -282,6 +282,18 @@ class AppointmentListCreateView(generics.ListCreateAPIView):
             except Patient.DoesNotExist:
                 return Appointment.objects.none()
         elif user.role == 'hospital':
+            # Check if this is a doctor staff member
+            try:
+                staff = HospitalStaff.objects.get(user=user)
+                if staff.role == 'doctor':
+                    try:
+                        doctor = Doctor.objects.get(user=user)
+                        return Appointment.objects.filter(doctor=doctor)
+                    except Doctor.DoesNotExist:
+                        return Appointment.objects.none()
+            except HospitalStaff.DoesNotExist:
+                pass
+            # Hospital admin/owner
             try:
                 return Appointment.objects.filter(hospital=user.hospital_profile)
             except Hospital.DoesNotExist:
@@ -297,6 +309,8 @@ class AppointmentListCreateView(generics.ListCreateAPIView):
                 serializer.save(patient=user.patient_profile)
             except Patient.DoesNotExist:
                 pass
+        else:
+            serializer.save()
 
 
 class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -313,6 +327,18 @@ class AppointmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             except Patient.DoesNotExist:
                 return Appointment.objects.none()
         elif user.role == 'hospital':
+            # Check if this is a doctor staff member
+            try:
+                staff = HospitalStaff.objects.get(user=user)
+                if staff.role == 'doctor':
+                    try:
+                        doctor = Doctor.objects.get(user=user)
+                        return Appointment.objects.filter(doctor=doctor)
+                    except Doctor.DoesNotExist:
+                        return Appointment.objects.none()
+            except HospitalStaff.DoesNotExist:
+                pass
+            # Hospital admin/owner
             try:
                 return Appointment.objects.filter(hospital=user.hospital_profile)
             except Hospital.DoesNotExist:
@@ -454,3 +480,330 @@ class PharmacyOrderDetailView(generics.RetrieveUpdateAPIView):
             except Pharmacy.DoesNotExist:
                 return PharmacyOrder.objects.none()
         return PharmacyOrder.objects.none()
+
+
+from rest_framework.views import APIView
+from django.db.models import Count, Sum
+from datetime import timedelta
+from django.utils import timezone
+from .models import HospitalStaff
+from .serializers import HospitalStaffSerializer
+
+class HospitalStaffListCreateView(APIView):
+    """List and create hospital staff. (For Hospital Admins)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+        # Find hospital: either user is the owner or a staff member
+        hospital = None
+        try:
+            hospital = user.hospital_profile
+        except Hospital.DoesNotExist:
+            # User might be a staff member
+            try:
+                staff_record = HospitalStaff.objects.get(user=user)
+                hospital = staff_record.hospital
+            except HospitalStaff.DoesNotExist:
+                pass
+        if not hospital:
+            return Response([], status=200)
+        staff = HospitalStaff.objects.filter(hospital=hospital)
+        return Response(HospitalStaffSerializer(staff, many=True).data)
+
+    def post(self, request):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        try:
+            hospital = user.hospital_profile
+        except Hospital.DoesNotExist:
+            return Response({'error': 'Hospital not found'}, status=404)
+
+        data = request.data
+        phone = data.get('phone_number')
+        name = data.get('name')
+        role = data.get('role', 'doctor')
+        
+        # Check if user exists
+        try:
+            staff_user = User.objects.get(phone_number=phone)
+        except User.DoesNotExist:
+            staff_user = User.objects.create_user(
+                phone_number=phone,
+                name=name,
+                role='hospital', # General role
+                email=data.get('email')
+            )
+            staff_user.set_unusable_password()
+            staff_user.save()
+            
+        # Create staff record
+        staff, created = HospitalStaff.objects.get_or_create(
+            hospital=hospital,
+            user=staff_user,
+            defaults={'role': role}
+        )
+        
+        # If doctor role, create Doctor profile too
+        if role == 'doctor':
+            Doctor.objects.get_or_create(
+                hospital=hospital,
+                user=staff_user,
+                defaults={
+                    'name': name,
+                    'specialization': data.get('specialization', 'General'),
+                    'qualification': data.get('qualification', ''),
+                    'experience_years': data.get('experience_years', 0),
+                    'consultation_fee': data.get('consultation_fee', 0),
+                    'is_available': data.get('is_available', True),
+                }
+            )
+
+        return Response(HospitalStaffSerializer(staff).data, status=201)
+
+class HospitalStaffDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete hospital staff."""
+    serializer_class = HospitalStaffSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'hospital':
+            try:
+                return HospitalStaff.objects.filter(hospital=user.hospital_profile)
+            except Hospital.DoesNotExist:
+                return HospitalStaff.objects.none()
+        return HospitalStaff.objects.none()
+        
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if 'is_active' in self.request.data:
+            user = instance.user
+            user.is_active = instance.is_active
+            user.save()
+
+    def perform_destroy(self, instance):
+        if instance.role == 'doctor':
+            Doctor.objects.filter(user=instance.user).delete()
+        instance.delete()
+
+
+class HospitalAnalyticsView(APIView):
+    """Get hospital analytics."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+        # Find hospital: either user is the owner or a staff member
+        hospital = None
+        try:
+            hospital = user.hospital_profile
+        except Hospital.DoesNotExist:
+            try:
+                staff_record = HospitalStaff.objects.get(user=user)
+                hospital = staff_record.hospital
+            except HospitalStaff.DoesNotExist:
+                pass
+        if not hospital:
+            return Response({'error': 'Hospital not found'}, status=404)
+
+        now = timezone.now()
+        thirty_days_ago = now - timedelta(days=30)
+        
+        appointments = Appointment.objects.filter(hospital=hospital)
+        
+        # Total counts
+        total_appointments = appointments.count()
+        total_doctors = Doctor.objects.filter(hospital=hospital).count()
+        total_patients = appointments.values('patient').distinct().count()
+        
+        # Appointments by status
+        status_counts = appointments.values('status').annotate(count=Count('id'))
+        
+        # Revenue estimate (Assuming doctors have fee and completed appointments)
+        revenue = sum([
+            apt.doctor.consultation_fee for apt in appointments.filter(status='completed')
+            if apt.doctor.consultation_fee
+        ])
+
+        return Response({
+            'total_appointments': total_appointments,
+            'total_doctors': total_doctors,
+            'total_patients': total_patients,
+            'revenue': revenue,
+            'status_breakdown': status_counts,
+        })
+
+class FeedbackCreateView(generics.CreateAPIView):
+    """Create feedback from any authenticated user."""
+    from .serializers import FeedbackSerializer
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class PatientLookupView(APIView):
+    """Lookup a patient by phone or Aadhar number. Returns full patient record with past visits."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        phone = request.query_params.get('phone')
+        aadhar = request.query_params.get('aadhar')
+
+        if not phone and not aadhar:
+            return Response({'error': 'Provide phone or aadhar query parameter'}, status=400)
+
+        try:
+            if phone:
+                target_user = User.objects.get(phone_number=phone, role='patient')
+            else:
+                target_user = User.objects.get(aadhar_number=aadhar, role='patient')
+
+            patient = target_user.patient_profile
+            from .serializers import PatientDetailSerializer
+            return Response({
+                'success': True,
+                'patient': PatientDetailSerializer(patient).data
+            })
+        except User.DoesNotExist:
+            return Response({'success': False, 'error': 'Patient not found'}, status=404)
+        except Patient.DoesNotExist:
+            return Response({'success': False, 'error': 'Patient profile not found'}, status=404)
+
+
+class DoctorAnalyticsView(APIView):
+    """Get visit analytics for the logged-in doctor."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        # Find the doctor profile for this user
+        try:
+            doctor = Doctor.objects.get(user=user)
+        except Doctor.DoesNotExist:
+            return Response({'error': 'Doctor profile not found'}, status=404)
+
+        now = timezone.now()
+
+        # Daily visits (last 7 days)
+        daily_visits = []
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            count = Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date__date=day.date()
+            ).count()
+            daily_visits.append({
+                'date': day.strftime('%a %d'),
+                'count': count
+            })
+
+        # Monthly visits (last 6 months)
+        monthly_visits = []
+        for i in range(5, -1, -1):
+            month_start = (now.replace(day=1) - timedelta(days=i * 30)).replace(day=1)
+            if i == 0:
+                month_end = now
+            else:
+                month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            count = Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date__gte=month_start,
+                appointment_date__lt=month_end
+            ).count()
+            monthly_visits.append({
+                'month': month_start.strftime('%b %Y'),
+                'count': count
+            })
+
+        # Total stats
+        total_patients = Appointment.objects.filter(doctor=doctor).values('patient').distinct().count()
+        total_completed = Appointment.objects.filter(doctor=doctor, status='completed').count()
+        total_scheduled = Appointment.objects.filter(doctor=doctor, status='scheduled').count()
+
+        return Response({
+            'daily_visits': daily_visits,
+            'monthly_visits': monthly_visits,
+            'total_patients': total_patients,
+            'total_completed': total_completed,
+            'total_scheduled': total_scheduled,
+        })
+
+
+class DoctorToggleAvailabilityView(APIView):
+    """Toggle doctor availability."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            doctor = Doctor.objects.get(pk=pk)
+            doctor.is_available = not doctor.is_available
+            doctor.save()
+            return Response({'success': True, 'is_available': doctor.is_available})
+        except Doctor.DoesNotExist:
+            return Response({'error': 'Doctor not found'}, status=404)
+
+
+class StaffToggleAccessView(APIView):
+    """Toggle staff access (activate/deactivate)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        if user.role != 'hospital':
+            return Response({'error': 'Unauthorized'}, status=403)
+        try:
+            staff = HospitalStaff.objects.get(pk=pk)
+            staff.is_active = not staff.is_active
+            staff.save()
+            # Also toggle the user's active status
+            staff_user = staff.user
+            staff_user.is_active = staff.is_active
+            staff_user.save()
+            return Response({'success': True, 'is_active': staff.is_active})
+        except HospitalStaff.DoesNotExist:
+            return Response({'error': 'Staff not found'}, status=404)
+
+
+class ConfigKeysView(APIView):
+    """Exposes configuration keys (Gemini, Groq) securely to authenticated requests."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.conf import settings
+        return Response({
+            'gemini_api_key': getattr(settings, 'GEMINI_API_KEY', ''),
+            'groq_api_key': getattr(settings, 'GROQ_API_KEY', '')
+        })
+
+
+class PharmacyInventoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a pharmacy inventory item."""
+    queryset = PharmacyInventory.objects.all()
+    serializer_class = PharmacyInventorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'pharmacy':
+            try:
+                return PharmacyInventory.objects.filter(pharmacy=user.pharmacy_profile)
+            except Pharmacy.DoesNotExist:
+                return PharmacyInventory.objects.none()
+        return PharmacyInventory.objects.none()
+

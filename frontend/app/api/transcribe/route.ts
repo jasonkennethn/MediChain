@@ -2,6 +2,32 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized: Missing Authorization header' }, { status: 401 });
+    }
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const configRes = await fetch(`${apiBaseUrl}/api/config/keys/`, {
+      headers: {
+        'Authorization': authHeader
+      }
+    });
+
+    if (!configRes.ok) {
+      return NextResponse.json({ error: 'Unauthorized or failed to fetch keys from backend' }, { status: 401 });
+    }
+
+    const { groq_api_key } = await configRes.json();
+    const groqKey = groq_api_key;
+    if (!groqKey) {
+      console.error('GROQ_API_KEY is not set on backend settings');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -9,15 +35,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'No audio file provided in the request' },
         { status: 400 }
-      );
-    }
-
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      console.error('GROQ_API_KEY is not set in environment variables');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
       );
     }
 

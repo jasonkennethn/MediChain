@@ -118,6 +118,10 @@ export interface ApiUser {
   aadhar_number: string | null;
   email: string | null;
   role: string;
+  staff_role?: string;
+  doctor_profile_id?: string;
+  hospital_id?: string;
+  is_active?: boolean;
   avatar: string | null;
   created_at: string;
   updated_at: string;
@@ -258,6 +262,7 @@ export async function apiCreateAppointment(data: {
   hospital: string;
   appointment_date: string;
   reason?: string;
+  patient?: string;
 }) {
   try {
     const response = await apiFetch('/appointments/', {
@@ -274,6 +279,12 @@ export async function apiUpdateAppointment(id: string, data: {
   notes?: string;
   reason?: string;
   status?: string;
+  symptoms?: any;
+  diagnosis?: string;
+  prescription_data?: any;
+  follow_up_instructions?: string;
+  tests_advised?: string;
+  transcript?: any;
 }) {
   try {
     const response = await apiFetch(`/appointments/${id}/`, {
@@ -305,6 +316,18 @@ export async function apiUpdateProfile(data: any) {
   }
 }
 
+export async function apiGetStaff() {
+  try {
+    const response = await apiFetch('/hospital/staff/', {}, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export async function apiCreateDoctor(data: {
   name: string;
   phone_number?: string;
@@ -316,9 +339,14 @@ export async function apiCreateDoctor(data: {
   is_available?: boolean;
 }) {
   try {
-    const response = await apiFetch('/doctors/', {
+    // We post to staff endpoint so a login User is created along with the Doctor profile
+    const payload = {
+      ...data,
+      role: 'doctor'
+    };
+    const response = await apiFetch('/hospital/staff/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     }, true);
     if (response.ok) {
       return await response.json();
@@ -406,6 +434,217 @@ export async function apiAdminVerifyEntity(entityType: 'hospital' | 'pharmacy', 
   }
 }
 
+export async function apiUpdateStaff(id: string, data: any) {
+  try {
+    const response = await apiFetch(`/hospital/staff/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiSubmitFeedback(message: string) {
+  try {
+    const response = await apiFetch('/feedback/', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiLookupPatient(params: { phone?: string; aadhar?: string }) {
+  try {
+    const searchParams = new URLSearchParams();
+    if (params.phone) searchParams.set('phone', params.phone);
+    if (params.aadhar) searchParams.set('aadhar', params.aadhar);
+    const response = await apiFetch(`/patients/lookup/?${searchParams.toString()}`, {}, true);
+    if (response.ok) {
+      const data = await response.json();
+      return data.success ? data.patient : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiGetDoctorAnalytics() {
+  try {
+    const response = await apiFetch('/doctor/analytics/', {}, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiAddDoctor(data: {
+  name: string;
+  specialization: string;
+  qualification?: string;
+  phone?: string;
+  email?: string;
+  experience_years?: number;
+  consultation_fee?: number;
+}) {
+  try {
+    const payload = { ...data, role: 'doctor', phone_number: data.phone };
+    const response = await apiFetch('/hospital/staff/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    const errData = await response.json().catch(() => null);
+    return { error: errData?.detail || 'Failed to add doctor' };
+  } catch {
+    return { error: 'Network error' };
+  }
+}
+
+export async function apiToggleDoctorAvailability(doctorId: string) {
+  try {
+    const response = await apiFetch(`/doctors/${doctorId}/toggle-availability/`, {
+      method: 'POST',
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiToggleStaffAccess(staffId: string) {
+  try {
+    const response = await apiFetch(`/hospital/staff/${staffId}/toggle-access/`, {
+      method: 'POST',
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Pharmacy Operations ───
+
+export async function apiGetPharmacyInventory() {
+  try {
+    const response = await apiFetch('/pharmacy/inventory/', {}, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiAddPharmacyInventoryItem(data: { medicine_name: string; stock_quantity: number; location?: string }) {
+  try {
+    const response = await apiFetch('/pharmacy/inventory/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    const errData = await response.json().catch(() => null);
+    return { error: errData?.detail || 'Failed to add inventory item' };
+  } catch {
+    return { error: 'Network error' };
+  }
+}
+
+export async function apiUpdatePharmacyInventoryItem(id: string, data: { stock_quantity?: number; location?: string }) {
+  try {
+    const response = await apiFetch(`/pharmacy/inventory/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiDeletePharmacyInventoryItem(id: string) {
+  try {
+    const response = await apiFetch(`/pharmacy/inventory/${id}/`, {
+      method: 'DELETE',
+    }, true);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function apiGetPharmacyOrders() {
+  try {
+    const response = await apiFetch('/pharmacy/orders/', {}, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiCreatePharmacyOrder(data: { patient_name: string; medicine_name: string; quantity: number; status?: string }) {
+  try {
+    const response = await apiFetch('/pharmacy/orders/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    const errData = await response.json().catch(() => null);
+    return { error: errData?.detail || 'Failed to create order' };
+  } catch {
+    return { error: 'Network error' };
+  }
+}
+
+export async function apiUpdatePharmacyOrderStatus(id: string, status: string) {
+  try {
+    const response = await apiFetch(`/pharmacy/orders/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, true);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Utility Exports ───
 
 export { clearTokens, getTokens, setTokens };
+
